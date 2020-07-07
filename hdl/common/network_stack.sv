@@ -36,6 +36,7 @@ module network_stack #(
     parameter NET_BANDWIDTH = 10,
     parameter WIDTH = 64,
     parameter MAC_ADDRESS = 48'hE59D02350A00, // LSB first, 00:0A:35:02:9D:E5
+    parameter IP_ADDRESS = 32'hD1D4010B, // LSB first: 11.1.212.209
     parameter IPV6_ADDRESS= 128'hE59D_02FF_FF35_0A02_0000_0000_0000_80FE, //LSB first: FE80_0000_0000_0000_020A_35FF_FF02_9DE5,
     parameter IP_SUBNET_MASK = 32'h00FFFFFF,
     parameter IP_DEFAULT_GATEWAY = 32'h00000000,
@@ -111,9 +112,10 @@ module network_stack #(
     axis_meta.master    m_axis_udp_rx_metadata,
     axi_stream.master   m_axis_udp_rx_data,
     axis_meta.slave     s_axis_udp_tx_metadata,
-    axi_stream.slave    s_axis_udp_tx_data
+    axi_stream.slave    s_axis_udp_tx_data,
     
- );
+    input wire [3:0]    ipaddr_config_data
+);
  
 localparam ddrPortNetworkRx = 1;
 localparam ddrPortNetworkTx = 0;
@@ -216,6 +218,15 @@ reg[127:0] link_local_ipv6_address;
 //assign dhcp_ip_address_en = 1'b1;
 //assign dhcp_ip_address = 32'hD1D4010A;
 
+logic [3:0] ipaddr_offset;
+always @(posedge net_clk) begin
+    if (~net_aresetn) begin
+        ipaddr_offset <= 0;
+    end else begin
+        ipaddr_offset <= ipaddr_config_data;
+    end
+end
+
 always @(posedge net_clk)
 begin
     if (net_aresetn == 0) begin
@@ -245,9 +256,14 @@ begin
             end
         end
         else begin
-            iph_ip_address <= local_ip_address;
-            arp_ip_address <= local_ip_address;
-            toe_ip_address <= local_ip_address;
+            // iph_ip_address <= local_ip_address;
+            // arp_ip_address <= local_ip_address;
+            // toe_ip_address <= local_ip_address;
+
+            // reconfigure ip address dynamically by an offset from ipaddr_config_data port
+            iph_ip_address <= {local_ip_address[31:28], local_ip_address[27:24]+ipaddr_offset, local_ip_address[23:0]};
+            arp_ip_address <= {local_ip_address[31:28], local_ip_address[27:24]+ipaddr_offset, local_ip_address[23:0]};
+            toe_ip_address <= {local_ip_address[31:28], local_ip_address[27:24]+ipaddr_offset, local_ip_address[23:0]};
             ip_subnet_mask <= IP_SUBNET_MASK;
             ip_default_gateway <= {local_ip_address[31:28], 8'h01, local_ip_address[23:0]};
         end
@@ -1473,7 +1489,7 @@ reg[3:0] board_number;
 
 always @(posedge net_clk) begin
     if (~net_aresetn) begin
-        local_ip_address <= 32'hD1D4010B;
+        local_ip_address <= IP_ADDRESS; // use the parameter value as the default address
         board_number <= 0;
     end
     else begin
