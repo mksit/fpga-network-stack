@@ -117,7 +117,7 @@ void open_port(	hls::stream<ap_uint<16> >&		listenPort,
 	switch (state)
 	{
 	case 0:
-		listenPort.write(7);
+		listenPort.write(2888);
 		state = 1;
 		break;
 	case 1:
